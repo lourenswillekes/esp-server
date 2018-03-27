@@ -100,16 +100,57 @@ char *webpage_html_start = "<!DOCTYPE html><html> <body> <center>"
         "<legend style=\"color:black;font-size:28px\">Environmental variables: </legend>"
         "<p style=\"color:black;font-size:28px\">";
 
+void formatStart(char *text,int red, int blue, int green){
+    char rtext[10], btext[10], gtext[10];
+    if(red){
+        strcpy(rtext,"checked");
+    }else{
+        strcpy(rtext,"notchecked");
+    }
+    if(blue){
+        strcpy(btext,"checked");
+    }else{
+        strcpy(btext,"notchecked");
+    }
+    if(green){
+        strcpy(gtext,"checked");
+    }else{
+        strcpy(gtext,"notchecked");
+    }
+    sprintf(text,"<!DOCTYPE html><html> <body> <center>"
+        "<h1>Set the color of LED light:<br></h1>"
+        "<form action=\"\" method=\"get\">"
+        "<p style=\"color:black;font-size:28px\"> LED color:<br> </p>"
+        "<p style=\"color:red;font-size:24px\">"
+        "<label for=\"red\">Red</label>"
+        "<input type=\"checkbox\" name=\"red\"%s> </p>"
+        "<p style=\"color:green;font-size:24px\">"
+        "<label for=\"green\">Green</label>"
+        "<input type=\"checkbox\" name=\"green\"%s> </p>"
+        "<p style=\"color:blue;font-size:24px\">"
+        "<label for=\"blue\">Blue</label>"
+        "<input type=\"checkbox\" name=\"blue\"%s> </p>"
+        "<p style=\"color:black;font-size:28px\">Turn Light:"
+        "<input type=\"radio\" name=\"OnOff\" value=\"on\"> On"
+        "<input type=\"radio\" name=\"OnOff\" value=\"off\" checked> Off<br></p>"
+        "<fieldset>"
+        "<legend style=\"color:black;font-size:28px\">Environmental variables: </legend>"
+        "<p style=\"color:black;font-size:28px\">",rtext,gtext,btext);
+}
+
 
 
 //seperated from webpage_html_start by data section that needs to be formated
 char *webpage_html_end = "</fieldset> <br> <input type=\"submit\" value=\"Submit\"> </form> </center> </body> </html>";
 
-void formatHTMLPage(char *msg, float temperature, float humidity, float pressure){
+void formatHTMLPage(char *msg, float temperature, float humidity, float pressure, int red, int blue, int green){
     char temp[100];
+    char temp2[500];
     msg[0] = 0;
     sprintf(temp,"Temperature: %02f<br>Humidity: %02f%%<br>Pressure: %3.1f mmHg<br></p>",temperature,humidity,pressure);
-    strcat(msg, webpage_html_start);
+    //strcat(msg, webpage_html_start);
+    formatStart(temp2,red,blue,green);
+    strcat(msg, temp2);
     strcat(msg, temp);
     strcat(msg, webpage_html_end);
 }
@@ -337,7 +378,7 @@ int main(void)
                 normal_temperature = compensated_data.temperature * 0.018 + 32;
 
                 // put data into webpage
-                formatHTMLPage(webpage, normal_temperature, normal_humidity, normal_pressure);
+                formatHTMLPage(webpage, normal_temperature, normal_humidity, normal_pressure,red_LED,blue_LED,green_LED);
 
                 // get channel number from http request
                 sscanf(req, "+IPD,%d", &channel);

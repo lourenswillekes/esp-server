@@ -73,6 +73,7 @@ const char *AT_CWSAP  = "AT+CWSAP_CUR=\"DRIZZY\",\"pass\",5,0\r\n";
 const char *AT_CIFSR  = "AT+CIFSR\r\n";
 const char *AT_CIPMUX = "AT+CIPMUX=1\r\n";
 const char *AT_SERVER = "AT+CIPSERVER=1,80\r\n";
+const char *web_response_header = "HTTP/1.1 200 OK\r\nConnection: close\r\n\r\n";
 
 
 volatile char buffer[BUFFER_LENGTH];
@@ -171,6 +172,7 @@ int main(void)
     int j;
     int channel;
     char cipsend[32];
+    char close[32];
     char *req = NULL;
     char *res = NULL;
     char webpage[1536];
@@ -388,6 +390,15 @@ int main(void)
 
                 // get channel number from http request
                 sscanf(req, "+IPD,%d", &channel);
+
+                //header response
+                sprintf(cipsend, "AT+CIPSEND=%d,%d\r\n", channel, strlen(web_response_header));
+                UART_transmitString(EUSCI_A2_BASE, cipsend);
+                while(strstr(buffer,">")==NULL){
+                    ;//wait for wrap
+                }
+                UART_transmitString(EUSCI_A2_BASE, web_response_header);
+                Timer32_waitms(100);
                 // format send command to channel for page length bytes
                 sprintf(cipsend, "AT+CIPSEND=%d,%d\r\n", channel, strlen(webpage));
                 // send the send command
@@ -399,7 +410,11 @@ int main(void)
                 UART_transmitString(EUSCI_A2_BASE, webpage);
                 //UART_transmitString(EUSCI_A2_BASE, "<html><p>test</p></html>");
                 //UART_transmitString(EUSCI_A2_BASE, test);
-                Timer32_waitms(100);
+                Timer32_waitms(500);
+
+                sprintf(close, "AT+CIPCLOSE=%d\r\n", channel);
+                UART_transmitString(EUSCI_A2_BASE, close);
+
             }
 
             //clear buffer. If not cleared, the web page will be sent indefinitely

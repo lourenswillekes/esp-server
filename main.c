@@ -66,11 +66,13 @@
 #define ON  1
 #define OFF 0
 
+const char *AT_RESET  = "AT+RST\r\n";
 const char *AT_MODE2  = "AT+CWMODE_CUR=2\r\n";
 const char *AT_CWSAP  = "AT+CWSAP_CUR=\"DRIZZY\",\"pass\",5,0\r\n";
 const char *AT_CIFSR  = "AT+CIFSR\r\n";
 const char *AT_CIPMUX = "AT+CIPMUX=1\r\n";
 const char *AT_SERVER = "AT+CIPSERVER=1,80\r\n";
+
 
 volatile char buffer[BUFFER_LENGTH];
 volatile uint16_t idx = 0;
@@ -97,34 +99,7 @@ char *webpage_html_start = "<!DOCTYPE html><html> <body> <center>"
         "<legend style=\"color:black;font-size:28px\">Environmental variables: </legend>"
         "<p style=\"color:black;font-size:28px\">";
 
-char *test ="<!DOCTYPE html><html> <body> <center>"
-        "<h1>Set the color of LED light:<br></h1>"
-        "<form action=\"\" method=\"get\">"
-        "<p style=\"color:black;font-size:28px\"> LED color:<br> </p>"
-        "<p style=\"color:red;font-size:24px\">"
-        "<label for=\"red\">Red</label>"
-        "<input type=\"checkbox\" name=\"red\"> </p>"
-        "<p style=\"color:green;font-size:24px\">"
-        "<label for=\"green\">Green</label>"
-        "<input type=\"checkbox\" name=\"green\"> </p>"
-        "<p style=\"color:blue;font-size:24px\">"
-        "<label for=\"blue\">Blue</label>"
-        "<input type=\"checkbox\" name=\"blue\"> </p>"
-        "<p style=\"color:black;font-size:28px\">Turn Light:"
-        "<input type=\"radio\" name=\"OnOff\" value=\"on\"> On"
-        "<input type=\"radio\" name=\"OnOff\" value=\"off\" checked> Off<br></p>"
-        "<fieldset>"
-        "<legend style=\"color:black;font-size:28px\">Environmental variables: </legend>"
-        "<p style=\"color:black;font-size:28px\">"
-        "Temperature: 22<br>"
-        "Humidity: 32<br>"
-        "Pressure: 44<br></p>"
-        "</fieldset><br>"
-        "<input type=\"submit\" value=\"Submit\">"
-        "</form>"
-        "</center>"
-        "</body>"
-        "</html>";
+
 
 //seperated from webpage_html_start by data section that needs to be formated
 char *webpage_html_end = "</fieldset> <br> <input type=\"submit\" value=\"Submit\"> </form> </center> </body> </html>";
@@ -168,13 +143,14 @@ int main(void)
     P2DIR |= BIT0|BIT1|BIT2;
     P2OUT &= ~(BIT0|BIT1|BIT2);
 
-    // clk = 12 MHz
+    // (s)mclk = 12 MHz
     MAP_CS_setDCOCenteredFrequency(CS_DCO_FREQUENCY_12);
     MAP_CS_initClockSignal(CS_MCLK, CS_DCOCLK_SELECT, CS_CLOCK_DIVIDER_1);
     MAP_CS_initClockSignal(CS_SMCLK, CS_DCOCLK_SELECT, CS_CLOCK_DIVIDER_1);
 
-    // initialize timer32
-    Timer32_init();
+    // initialize bme
+    BME280_init(&dev);    // initializes timer32
+    //Timer32_init();
 
     // initialize uart
     UARTA0_init();
@@ -183,12 +159,10 @@ int main(void)
     // enable interrupts
     MAP_Interrupt_enableMaster();
 
-    // initialize bme
-    //BME280_init(&dev);
 
 
     // reset the esp
-    UART_transmitString(EUSCI_A2_BASE, "AT+RST\r\n");
+    UART_transmitString(EUSCI_A2_BASE, AT_RESET);
     Timer32_waitms(500);
 
     // set mode to softap
@@ -347,10 +321,10 @@ int main(void)
             if (NULL != res)
             {
                 // read bme
-                //BME280_read(&dev, &compensated_data);
-                compensated_data.humidity = 10;
-                compensated_data.pressure = 20;
-                compensated_data.temperature = 30;
+                BME280_read(&dev, &compensated_data);
+                //compensated_data.humidity = 10;
+                //compensated_data.pressure = 20;
+                //compensated_data.temperature = 30;
                 // format the sensor data properly
                 normal_humidity = compensated_data.humidity / 1000;
                 normal_pressure = (compensated_data.pressure / 13332.237) + 17;

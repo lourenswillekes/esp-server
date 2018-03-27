@@ -8,11 +8,6 @@
 //
 // modified by RWB 2/9/2018
 
-
-/*
- *
- */
-
 #include <stdint.h>
 #include "msp.h"
 #include "I2C.h"
@@ -41,9 +36,7 @@ void I2C_Init(void) {
     // set the baud rate for the eUSCI which gets its clock from SMCLK
     // Clock_Init48MHz() from ClockSystem.c sets SMCLK = HFXTCLK/4 = 12 MHz
     // if the SMCLK is set to 12 MHz, divide by 120 for 100 kHz baud clock
-    //UCB1BRW = 120;
-    // BUT.. smclk is set to 3 MHz on the remote station so divide by 30.
-    UCB1BRW = 30;
+    UCB1BRW = 120;
     P6SEL0 |= 0x30;
     P6SEL1 &= ~0x30;                   // configure P6.4 and P6.5 as primary module function
     UCB1CTLW0 &= ~0x0001;              // enable eUSCI module

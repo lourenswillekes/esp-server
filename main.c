@@ -260,14 +260,17 @@ int main(void)
         {
             int i = 0;
             char temp[3];
+            char get_request[60];
             //check if update
             res = strstr(req, "?");
             if(res != NULL)
             {
+                sscanf(res,"?%60s",get_request);
                 //check for red
-                res = strstr(req, "red=");
+                res = strstr(get_request, "red=");
                 if(res != NULL){
                     sscanf(res,"red=%2c",temp);
+
                     if(temp[1]=='n'){
                         red_LED = ON;
                     }else{
@@ -278,7 +281,7 @@ int main(void)
                 }
                 temp[1]='x';
                 //check for blue
-                res = strstr(req, "blue=");
+                res = strstr(get_request, "blue=");
                 if(res != NULL){
                     sscanf(res,"blue=%2c",temp);
                     if(temp[1]=='n'){
@@ -291,7 +294,7 @@ int main(void)
                 }
                 temp[1]='x';
                 //check for green
-                res = strstr(req, "green=");
+                res = strstr(get_request, "green=");
                 if(res != NULL){
                     sscanf(res,"green=%2c",temp);
                     if(temp[1]=='n'){
@@ -304,7 +307,7 @@ int main(void)
                 }
                 temp[1]='x';
                 //check for on/off
-                res = strstr(req, "OnOff");
+                res = strstr(get_request, "OnOff");
                 if(res != NULL){
                     sscanf(res,"OnOff=%2c",temp);
                     if(temp[1]=='n'){

@@ -57,7 +57,8 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-#include "BME280_driver.h"          // eusci_b1
+//#include "BME280_driver.h"          // eusci_b1
+#include "environment_sensor.h"
 #include "Timer32_driver.h"
 #include "UART_driver.h"
 
@@ -148,9 +149,11 @@ int main(void)
     MAP_CS_initClockSignal(CS_MCLK, CS_DCOCLK_SELECT, CS_CLOCK_DIVIDER_1);
     MAP_CS_initClockSignal(CS_SMCLK, CS_DCOCLK_SELECT, CS_CLOCK_DIVIDER_1);
 
+    Timer32_init();
+
     // initialize bme
-    BME280_init(&dev);    // initializes timer32
-    //Timer32_init();
+    BME280_Init(&dev);    // initializes timer32
+
 
     // initialize uart
     UARTA0_init();
@@ -321,7 +324,7 @@ int main(void)
             if (NULL != res)
             {
                 // read bme
-                BME280_read(&dev, &compensated_data);
+                BME280_Read(&dev, &compensated_data);
                 //compensated_data.humidity = 10;
                 //compensated_data.pressure = 20;
                 //compensated_data.temperature = 30;

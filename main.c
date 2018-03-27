@@ -57,6 +57,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+#include "BME280_driver.h"          // eusci_b1
 #include "Timer32_driver.h"
 #include "UART_driver.h"
 
@@ -130,9 +131,11 @@ char *webpage_html_end = "</fieldset> <br> <input type=\"submit\" value=\"Submit
 
 void formatHTMLPage(char *msg, float temperature, float humidity, float pressure){
     char temp[100];
+    msg[0] = 0;
     sprintf(temp,"Temperature: %02f<br>Humidity: %02f%%<br>Pressure: %3.1f mmHg<br></p>",temperature,humidity,pressure);
-    msg = strcat(webpage_html_start,temp);
-    msg = strcat(msg,webpage_html_end);
+    strcat(msg, webpage_html_start);
+    strcat(msg, temp);
+    strcat(msg, webpage_html_end);
 }
 
 int red_LED = OFF, blue_LED = OFF, green_LED = OFF, onOff = OFF;
@@ -144,11 +147,19 @@ int main(void)
 {
     int j;
     int channel;
-    char webpage[1500];
-    formatHTMLPage(webpage, 20.5,27.2,32.7);
     char cipsend[32];
     char *req = NULL;
     char *res = NULL;
+    char webpage[1536];
+
+    // data used by the bme
+    struct bme280_dev dev;
+    struct bme280_data compensated_data;
+    float normal_humidity = 0;
+    float normal_pressure = 0;
+    float normal_temperature = 0;
+
+
 
     /* Stop Watchdog  */
     MAP_WDT_A_holdTimer();
@@ -172,7 +183,11 @@ int main(void)
     // enable interrupts
     MAP_Interrupt_enableMaster();
 
+    // initialize bme
+    //BME280_init(&dev);
 
+
+    // reset the esp
     UART_transmitString(EUSCI_A2_BASE, "AT+RST\r\n");
     Timer32_waitms(500);
 
@@ -228,7 +243,7 @@ int main(void)
     // allow multiple connections
     idx = 0;
     UART_transmitString(EUSCI_A2_BASE, AT_CIPMUX);
-    Timer32_waitms(500);
+    Timer32_waitms(1000);
     res = strstr(buffer, "OK");
     if (NULL != res)
     {
@@ -326,26 +341,46 @@ int main(void)
                 //Update LEDs
                 updateLEDs();
             }
+
+            // search buffer for http request
             res = strstr(req, "HTTP");
             if (NULL != res)
             {
+                // read bme
+                //BME280_read(&dev, &compensated_data);
+                compensated_data.humidity = 10;
+                compensated_data.pressure = 20;
+                compensated_data.temperature = 30;
+                // format the sensor data properly
+                normal_humidity = compensated_data.humidity / 1000;
+                normal_pressure = (compensated_data.pressure / 13332.237) + 17;
+                normal_temperature = compensated_data.temperature * 0.018 + 32;
+
+                // put data into webpage
+                formatHTMLPage(webpage, normal_temperature, normal_humidity, normal_pressure);
+
+                // get channel number from http request
                 sscanf(req, "+IPD,%d", &channel);
-                sprintf(cipsend, "AT+CIPSEND=%d,%d\r\n", channel,strlen(test));
+                // format send command to channel for page length bytes
+                sprintf(cipsend, "AT+CIPSEND=%d,%d\r\n", channel, strlen(webpage));
+                // send the send command
                 UART_transmitString(EUSCI_A2_BASE, cipsend);
                 while(strstr(buffer,">")==NULL){
                     ;//wait for wrap
                 }
+                // send the webpage
+                UART_transmitString(EUSCI_A2_BASE, webpage);
                 //UART_transmitString(EUSCI_A2_BASE, "<html><p>test</p></html>");
-                UART_transmitString(EUSCI_A2_BASE, test);
+                //UART_transmitString(EUSCI_A2_BASE, test);
                 Timer32_waitms(100);
             }
 
-            //clear buffer. If not cleared, the web page will be sent indefinitly
-            for(i=0;i<BUFFER_LENGTH;i++){
-                buffer[i]="\z";
-            }
+            //clear buffer. If not cleared, the web page will be sent indefinitely
             idx = 0;
-            buffer[0] = 0;
+            for(i = 0; i < BUFFER_LENGTH; i++)
+            {
+                buffer[i] = 0;
+            }
 
         }
 

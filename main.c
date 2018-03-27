@@ -62,6 +62,8 @@
 
 
 #define BUFFER_LENGTH 1024
+#define ON  1
+#define OFF 0
 
 const char *AT_MODE2  = "AT+CWMODE_CUR=2\r\n";
 const char *AT_CWSAP  = "AT+CWSAP_CUR=\"DRIZZY\",\"pass\",5,0\r\n";
@@ -74,17 +76,86 @@ volatile uint16_t idx = 0;
 volatile uint8_t response_complete = 0;
 volatile int err = 0;
 
+char *webpage_html_start = "<!DOCTYPE html><html> <body> <center>"
+        "<h1>Set the color of LED light:<br></h1>"
+        "<form action=\"\" method=\"get\">"
+        "<p style=\"color:black;font-size:28px\"> LED color:<br> </p>"
+        "<p style=\"color:red;font-size:24px\">"
+        "<label for=\"red\">Red</label>"
+        "<input type=\"checkbox\" name=\"red\"> </p>"
+        "<p style=\"color:green;font-size:24px\">"
+        "<label for=\"green\">Green</label>"
+        "<input type=\"checkbox\" name=\"green\"> </p>"
+        "<p style=\"color:blue;font-size:24px\">"
+        "<label for=\"blue\">Blue</label>"
+        "<input type=\"checkbox\" name=\"blue\"> </p>"
+        "<p style=\"color:black;font-size:28px\">Turn Light:"
+        "<input type=\"radio\" name=\"OnOff\" value=\"on\"> On"
+        "<input type=\"radio\" name=\"OnOff\" value=\"off\" checked> Off<br></p>"
+        "<fieldset>"
+        "<legend style=\"color:black;font-size:28px\">Environmental variables: </legend>"
+        "<p style=\"color:black;font-size:28px\">";
+
+char *test ="<!DOCTYPE html><html> <body> <center>"
+        "<h1>Set the color of LED light:<br></h1>"
+        "<form action=\"\" method=\"get\">"
+        "<p style=\"color:black;font-size:28px\"> LED color:<br> </p>"
+        "<p style=\"color:red;font-size:24px\">"
+        "<label for=\"red\">Red</label>"
+        "<input type=\"checkbox\" name=\"red\"> </p>"
+        "<p style=\"color:green;font-size:24px\">"
+        "<label for=\"green\">Green</label>"
+        "<input type=\"checkbox\" name=\"green\"> </p>"
+        "<p style=\"color:blue;font-size:24px\">"
+        "<label for=\"blue\">Blue</label>"
+        "<input type=\"checkbox\" name=\"blue\"> </p>"
+        "<p style=\"color:black;font-size:28px\">Turn Light:"
+        "<input type=\"radio\" name=\"OnOff\" value=\"on\"> On"
+        "<input type=\"radio\" name=\"OnOff\" value=\"off\" checked> Off<br></p>"
+        "<fieldset>"
+        "<legend style=\"color:black;font-size:28px\">Environmental variables: </legend>"
+        "<p style=\"color:black;font-size:28px\">"
+        "Temperature: 22<br>"
+        "Humidity: 32<br>"
+        "Pressure: 44<br></p>"
+        "</fieldset><br>"
+        "<input type=\"submit\" value=\"Submit\">"
+        "</form>"
+        "</center>"
+        "</body>"
+        "</html>";
+
+//seperated from webpage_html_start by data section that needs to be formated
+char *webpage_html_end = "</fieldset> <br> <input type=\"submit\" value=\"Submit\"> </form> </center> </body> </html>";
+
+void formatHTMLPage(char *msg, float temperature, float humidity, float pressure){
+    char temp[100];
+    sprintf(temp,"Temperature: %02f<br>Humidity: %02f%%<br>Pressure: %3.1f mmHg<br></p>",temperature,humidity,pressure);
+    msg = strcat(webpage_html_start,temp);
+    msg = strcat(msg,webpage_html_end);
+}
+
+int red_LED = OFF, blue_LED = OFF, green_LED = OFF, onOff = OFF;
+void updateLEDs(void);
+
+
 
 int main(void)
 {
     int j;
     int channel;
+    char webpage[1500];
+    formatHTMLPage(webpage, 20.5,27.2,32.7);
     char cipsend[32];
     char *req = NULL;
     char *res = NULL;
 
     /* Stop Watchdog  */
     MAP_WDT_A_holdTimer();
+
+    //LED Config
+    P2DIR |= BIT0|BIT1|BIT2;
+    P2OUT &= ~(BIT0|BIT1|BIT2);
 
     // clk = 12 MHz
     MAP_CS_setDCOCenteredFrequency(CS_DCO_FREQUENCY_12);
@@ -192,31 +263,117 @@ int main(void)
     {
 
         req = strstr(buffer, "+IPD");
+        Timer32_waitms(100);
         if (NULL != req)
         {
+            int i = 0;
+            char temp[3];
+            //check if update
+            res = strstr(req, "?");
+            if(res != NULL)
+            {
+                //check for red
+                res = strstr(req, "red=");
+                if(res != NULL){
+                    sscanf(res,"red=%2c",temp);
+                    if(temp[1]=='n'){
+                        red_LED = ON;
+                    }else{
+                        red_LED = OFF;
+                    }
+                }else{
+                    red_LED = OFF;
+                }
+                temp[1]='x';
+                //check for blue
+                res = strstr(req, "blue=");
+                if(res != NULL){
+                    sscanf(res,"blue=%2c",temp);
+                    if(temp[1]=='n'){
+                        blue_LED = ON;
+                    }else{
+                        blue_LED = OFF;
+                    }
+                }else{
+                    blue_LED = OFF;
+                }
+                temp[1]='x';
+                //check for green
+                res = strstr(req, "green=");
+                if(res != NULL){
+                    sscanf(res,"green=%2c",temp);
+                    if(temp[1]=='n'){
+                        green_LED = ON;
+                    }else{
+                        green_LED = OFF;
+                    }
+                }else{
+                    green_LED = OFF;
+                }
+                temp[1]='x';
+                //check for on/off
+                res = strstr(req, "OnOff");
+                if(res != NULL){
+                    sscanf(res,"OnOff=%2c",temp);
+                    if(temp[1]=='n'){
+                        onOff = ON;
+                    }else{
+                        onOff = OFF;
+                    }
+                }
+                temp[1]='x';
+
+                //Update LEDs
+                updateLEDs();
+            }
             res = strstr(req, "HTTP");
             if (NULL != res)
             {
                 sscanf(req, "+IPD,%d", &channel);
-                sprintf(cipsend, "AT+CIPSEND=%d,4\r\n", channel);
+                sprintf(cipsend, "AT+CIPSEND=%d,%d\r\n", channel,strlen(test));
                 UART_transmitString(EUSCI_A2_BASE, cipsend);
-                UART_transmitString(EUSCI_A2_BASE, "test\r\n");
+                while(strstr(buffer,">")==NULL){
+                    ;//wait for wrap
+                }
+                //UART_transmitString(EUSCI_A2_BASE, "<html><p>test</p></html>");
+                UART_transmitString(EUSCI_A2_BASE, test);
+                Timer32_waitms(100);
             }
 
+            //clear buffer. If not cleared, the web page will be sent indefinitly
+            for(i=0;i<BUFFER_LENGTH;i++){
+                buffer[i]="\z";
+            }
             idx = 0;
             buffer[0] = 0;
 
         }
 
-
-
     }
-
-
-
 
 }
 
+void updateLEDs(void){
+    if(onOff == ON){
+        if(red_LED == ON){
+            P2OUT |= BIT0;
+        }else{
+            P2OUT &= ~BIT0;
+        }
+        if(blue_LED == ON){
+            P2OUT |= BIT2;
+        }else{
+            P2OUT &= ~BIT2;
+        }
+        if(green_LED == ON){
+            P2OUT |= BIT1;
+        }else{
+            P2OUT &= ~BIT1;
+        }
+    }else{
+        P2OUT &= ~(BIT0|BIT1|BIT2);
+    }
+}
 
 void UARTA0_ISR(void)
 {

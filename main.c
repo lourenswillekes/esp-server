@@ -170,7 +170,6 @@ void updateLEDs(void);
 
 int main(void)
 {
-    int j;
     int channel;
     char cipsend[32];
     char close[32];

@@ -52,21 +52,20 @@
  * Author: 
 *******************************************************************************/
 
+/*Includes*/
 #include "driverlib.h"
-
 #include <stdint.h>
 #include <stdbool.h>
-
-//#include "BME280_driver.h"          // eusci_b1
 #include "environment_sensor.h"
 #include "Timer32_driver.h"
 #include "UART_driver.h"
 
-
+/* Definitions */
 #define BUFFER_LENGTH 1024
 #define ON  1
 #define OFF 0
 
+//Frequently Used AT Commands
 const char *AT_RESET  = "AT+RST\r\n";
 const char *AT_MODE2  = "AT+CWMODE_CUR=2\r\n";
 const char *AT_CWSAP  = "AT+CWSAP_CUR=\"DRIZZY\",\"pass\",5,0\r\n";
@@ -75,12 +74,13 @@ const char *AT_CIPMUX = "AT+CIPMUX=1\r\n";
 const char *AT_SERVER = "AT+CIPSERVER=1,80\r\n";
 const char *web_response_header = "HTTP/1.1 200 OK\r\nConnection: close\r\n\r\n";
 
-
+//UART comm variables
 volatile char buffer[BUFFER_LENGTH];
 volatile uint16_t idx = 0;
 volatile uint8_t response_complete = 0;
 volatile int err = 0;
 
+//HTML
 char *webpage_html_start = "<!DOCTYPE html><html> <body> <center>"
         "<h1>Set the color of LED light:<br></h1>"
         "<form action=\"\" method=\"get\">"
@@ -101,6 +101,7 @@ char *webpage_html_start = "<!DOCTYPE html><html> <body> <center>"
         "<legend style=\"color:black;font-size:28px\">Environmental variables: </legend>"
         "<p style=\"color:black;font-size:28px\">";
 
+//Generate the first portions of the html code
 void formatStart(char *text,int red, int blue, int green, int onoff){
     char rtext[10], btext[10], gtext[10], ontext[10], offtext[10];
     if(red){
@@ -145,11 +146,10 @@ void formatStart(char *text,int red, int blue, int green, int onoff){
         "<p style=\"color:black;font-size:28px\">",rtext,gtext,btext,ontext,offtext);
 }
 
-
-
 //seperated from webpage_html_start by data section that needs to be formated
 char *webpage_html_end = "</fieldset> <br> <input type=\"submit\" value=\"Submit\"> </form> </center> </body> </html>";
 
+//Generate HTML webpage
 void formatHTMLPage(char *msg, float temperature, float humidity, float pressure, int red, int blue, int green, int onoff){
     char temp[100];
     char temp2[1000];
@@ -162,10 +162,11 @@ void formatHTMLPage(char *msg, float temperature, float humidity, float pressure
     strcat(msg, webpage_html_end);
 }
 
+//Global status indicators
 int red_LED = OFF, blue_LED = OFF, green_LED = OFF, onOff = OFF;
+
+//Function prototype
 void updateLEDs(void);
-
-
 
 int main(void)
 {
@@ -184,8 +185,6 @@ int main(void)
     float normal_pressure = 0;
     float normal_temperature = 0;
 
-
-
     /* Stop Watchdog  */
     MAP_WDT_A_holdTimer();
 
@@ -198,11 +197,11 @@ int main(void)
     MAP_CS_initClockSignal(CS_MCLK, CS_DCOCLK_SELECT, CS_CLOCK_DIVIDER_1);
     MAP_CS_initClockSignal(CS_SMCLK, CS_DCOCLK_SELECT, CS_CLOCK_DIVIDER_1);
 
+    //Timer 32 initialization
     Timer32_init();
 
     // initialize bme
     BME280_Init(&dev);    // initializes timer32
-
 
     // initialize uart
     UARTA0_init();
@@ -210,8 +209,6 @@ int main(void)
 
     // enable interrupts
     MAP_Interrupt_enableMaster();
-
-
 
     // reset the esp
     UART_transmitString(EUSCI_A2_BASE, AT_RESET);
@@ -302,7 +299,7 @@ int main(void)
     idx = 0;
     while (1)
     {
-
+        //Check to see if a browser sent a response
         req = strstr(buffer, "+IPD");
         Timer32_waitms(100);
         if (NULL != req)
@@ -377,9 +374,7 @@ int main(void)
             {
                 // read bme
                 BME280_Read(&dev, &compensated_data);
-                //compensated_data.humidity = 10;
-                //compensated_data.pressure = 20;
-                //compensated_data.temperature = 30;
+
                 // format the sensor data properly
                 normal_humidity = compensated_data.humidity / 1000;
                 normal_pressure = (compensated_data.pressure / 13332.237) + 17;
@@ -399,8 +394,10 @@ int main(void)
                 }
                 UART_transmitString(EUSCI_A2_BASE, web_response_header);
                 Timer32_waitms(100);
+
                 // format send command to channel for page length bytes
                 sprintf(cipsend, "AT+CIPSEND=%d,%d\r\n", channel, strlen(webpage));
+
                 // send the send command
                 UART_transmitString(EUSCI_A2_BASE, cipsend);
                 while(strstr(buffer,">")==NULL){
@@ -408,8 +405,7 @@ int main(void)
                 }
                 // send the webpage
                 UART_transmitString(EUSCI_A2_BASE, webpage);
-                //UART_transmitString(EUSCI_A2_BASE, "<html><p>test</p></html>");
-                //UART_transmitString(EUSCI_A2_BASE, test);
+
                 Timer32_waitms(500);
 
                 sprintf(close, "AT+CIPCLOSE=%d\r\n", channel);
